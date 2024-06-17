@@ -39,13 +39,19 @@ def handle_connection(conn: socket.socket, directory: str):
                 response = f"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {len(userAgent)}\r\n\r\n{userAgent.decode()}"
                 conn.sendall(response.encode())
             case "files":
-                try:
-                    with open(directory + requestSegments[2]) as f:
-                        contents = f.read()
-                    response = f"HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: {len(contents)}\r\n\r\n{contents}"
-                    conn.sendall(response.encode())
-                except FileNotFoundError:
-                    conn.sendall(b"HTTP/1.1 404 Not Found\r\n\r\n")
+                if requestMethod == "GET":
+                    try:
+                        with open(directory + requestSegments[2]) as f:
+                            contents = f.read()
+                        response = f"HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: {len(contents)}\r\n\r\n{contents}"
+                        conn.sendall(response.encode())
+                    except FileNotFoundError:
+                        conn.sendall(b"HTTP/1.1 404 Not Found\r\n\r\n")
+                elif requestMethod == "POST":
+                    content = data[data.find(b"Content-Length") :].split(b"\r\n")[2]
+                    with open(directory + requestSegments[2], "w") as f:
+                        f.write(content.decode())
+                    conn.sendall(b"HTTP/1.1 201 Created\r\n\r\n")
             case _:
                 conn.sendall(b"HTTP/1.1 404 Not Found\r\n\r\n")
 
