@@ -1,16 +1,21 @@
 import socket
 from threading import Thread
+import argparse
+
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--directory", type=str)
+    args = parser.parse_args()
 
     server_socket = socket.create_server(("localhost", 4221), reuse_port=True)
     while True:
         conn, _ = server_socket.accept()
-        t = Thread(target=handle_connection, args=(conn,))
+        t = Thread(target=handle_connection, args=(conn, args.directory))
         t.start()
 
 
-def handle_connection(conn: socket.socket):
+def handle_connection(conn: socket.socket, directory: str):
     with conn:
         data = conn.recv(1024)
         requestData = data.split(b"\r\n")
@@ -31,9 +36,16 @@ def handle_connection(conn: socket.socket):
                 userAgent = (
                     data[data.find(b"User-Agent") :].split(b" ")[1].strip(b"\r\n")
                 )
-                print(userAgent)
                 response = f"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {len(userAgent)}\r\n\r\n{userAgent.decode()}"
                 conn.sendall(response.encode())
+            case "files":
+                try:
+                    with open(directory + requestSegments[2]) as f:
+                        contents = f.read()
+                    response = f"HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: {len(contents)}\r\n\r\n{contents}"
+                    conn.sendall(response.encode())
+                except FileNotFoundError:
+                    conn.sendall(b"HTTP/1.1 404 Not Found\r\n\r\n")
             case _:
                 conn.sendall(b"HTTP/1.1 404 Not Found\r\n\r\n")
 
